@@ -36,6 +36,7 @@ This project builds a moderately strong empirical linear regression model (R-squ
 ├── final_figures.pdf       # Contains the figures rendered in project_analysis.Rmd
 ├── final_report.pdf        # Full analytical report and statistical write-up
 ├── .gitignore              # Configured to exclude proprietary raw data and RStudio cache
+├── .bond_analysis.Rproj    # .Rproj file 
 └── README.md               # Project documentation
 ```
 
