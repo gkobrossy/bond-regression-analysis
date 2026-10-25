@@ -31,7 +31,7 @@ This project builds a moderately strong empirical linear regression model (R-squ
 ## Repository Structure
 
 ```text
-├── 00_prep.R               # Data cleaning, feature engineering, and joining script
+├── 00_prep.R               # Data cleaning, feature engineering, and joining script. 
 ├── project_analysis.Rmd    # Complate R Markdown source script containing code and figures
 ├── final_figures.pdf       # Contains the figures rendered in project_analysis.Rmd
 ├── final_report.pdf        # Full analytical report and statistical write-up
@@ -51,6 +51,7 @@ This project builds a moderately strong empirical linear regression model (R-squ
 
 ## Data Restrictions
 The raw financial data used in this project was sourced from FactSet under proprietary licensing. Therefore, raw dataset files are omitted from this public repository.
+*Note: Since the raw data files are not included, running `00_prep.R` directly will return a file-not-found error. The script is provided to demonstrate data cleaning, feature engineering, and joining methodology for transparency.*
 
 ## Authors
 - Robert Silaghi
