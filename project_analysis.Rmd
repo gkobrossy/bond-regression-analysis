@@ -1,0 +1,485 @@
+---
+title: "Bond Yield Regression Analysis"
+author: "Robert Silaghi, George Kobrossy, and Malachi Cassels"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+```{r load_packages, warning = FALSE, message = FALSE, include=FALSE}
+library(tidyverse)
+library(patchwork)
+library(modelr)
+library(car)
+library(olsrr)
+```
+
+
+```{r read_data, include=FALSE}
+# Load the cleaned bond dataset.
+# Note: This dataset is omitted from this GitHub repo
+data_path <- "data/Cleaned_Bond_Data_Final.csv"
+  if (!file.exists(data_path)) {
+  stop("The raw data has been omitted from this repository due to proprietary licensing. Please see the compiled PDF report for full outputs and figures.")
+}
+bond_data <- read.csv(data_path)
+#head(bond_data, n = 10)
+```
+
+
+
+\newpage
+
+
+## Figure 1: Descriptive Statistics of Predictor Variables
+
+```{r}
+
+summary(
+  bond_data[, c("total_debt_ebitda", "ebitda_margin", "market_value", "sales")]
+  )
+
+# 
+table(bond_data$time_to_maturity)
+
+bond_data |> 
+  count(rbics_economy) |> 
+  ggplot() +
+    geom_col(
+      aes(x = fct_reorder(rbics_economy, n), y = n), 
+      color = "black", fill = "white"
+      ) +
+    labs(
+      x = "Sector",
+      y = "Frequency",
+      title = "Frequency of RBICS Sectors",
+      subtitle = "Data is from 1081 bonds issued in the past year"
+    ) +
+    coord_flip()
+
+```
+\newpage
+
+## Figure 2: Descriptive Statistics of the Response Variable
+
+```{r}
+
+ggplot(data = bond_data, aes(x = yield_to_maturity)) + 
+  geom_histogram(bins = 25, color = "black", fill = "white") + 
+  labs(
+    title = "Histogram of Yield to Maturity for Senior Secured Bonds",
+    subtitle = "Data is from 1081 bonds issued in the past year",
+    x = "Yield to Maturity (in %)",
+    y = "Frequency"
+    )
+
+summary(bond_data$yield_to_maturity)
+paste0("Standard Deviation: ", round(sd(bond_data$yield_to_maturity), 4))
+
+```
+
+
+\newpage
+
+## Figure 3: Scatterplot Matrix and Multicollinearity Diagnostics for the Initial Model
+
+```{r}
+plot(~ yield_to_maturity + total_debt_ebitda + ebitda_margin + market_value, data = bond_data)
+
+bond_data |> 
+  select(yield_to_maturity, total_debt_ebitda, ebitda_margin, market_value) |> 
+  cor()
+
+vif(lm(yield_to_maturity ~ total_debt_ebitda + ebitda_margin + market_value, data = bond_data))
+
+```
+
+
+
+\newpage
+
+## Figure 4: Initial Model Summary and Diagnostic Plots
+
+```{r}
+lm_yield <- lm(yield_to_maturity ~ total_debt_ebitda + ebitda_margin + market_value + 
+                 time_to_maturity, data = bond_data)
+summary(lm_yield)
+
+
+plot(lm_yield, which = 1, id.n = 0, add.smooth = FALSE)
+
+plot(lm_yield, which = 2, id.n = 0)
+
+```
+
+
+\newpage
+
+## Figure 5: Log Transformation for *Yield To Maturity*
+
+```{r}
+p1 <- ggplot(data = bond_data, aes(x = yield_to_maturity)) + 
+  geom_histogram(bins = 25, color = "black", fill = "white") + 
+  labs(
+    title = "Histogram of Yield to Maturity",
+    x = "Yield to Maturity (in %)",
+    y = "Frequency"
+    )
+
+p2 <- ggplot(data = bond_data, aes(x = log(yield_to_maturity))) + 
+  geom_histogram(bins = 25, color = "black", fill = "white") + 
+  labs(
+    title = "Histogram of log(Yield to Maturity)",
+    x = "log(Yield to Maturity)",
+    y = "Frequency"
+    )
+
+p1 + p2
+```
+
+
+\newpage
+
+
+
+## Figure 6: Log Transformation for *EBITDA Margin*
+
+```{r}
+p5 <- ggplot(data = bond_data, aes(x = ebitda_margin)) + 
+  geom_histogram(bins = 25, color = "black", fill = "white") +
+    labs(
+    title = "Histogram of EBITDA Margin",
+
+    x = "EBITDA Margin (in %)",
+    y = "Frequency"
+    )
+
+p6 <- ggplot(data = bond_data, aes(x = log(ebitda_margin))) + 
+  geom_histogram(bins = 25, color = "black", fill = "white") +
+    labs(
+    title = "Histogram of log(EBITDA Margin)",
+    x = "log(EBITDA Margin)",
+    y = "Frequency"
+    )
+
+p5 + p6
+```
+
+
+\newpage
+
+## Figure 7: Log Transformation for *Market Value*
+
+```{r}
+p7 <- ggplot(data = bond_data, aes(x = market_value)) + 
+  geom_histogram(bins = 30, color = "black", fill = "white") +
+  scale_x_continuous(labels = scales::label_comma()) +
+    labs(
+    title = "Histogram of Market Values",
+    x = "Market Value (in millions of USD)",
+    y = "Frequency"
+    )
+
+p8 <- ggplot(data = bond_data, aes(x = log(market_value))) + 
+  geom_histogram(bins = 30, color = "black", fill = "white") +
+  scale_x_continuous(labels = scales::label_comma()) +
+    labs(
+    title = "Histogram of log(Market Values)",
+    x = "log(Market Value)",
+    y = "Frequency"
+    )
+  
+
+p7 + p8
+  
+```
+
+
+
+\newpage
+
+## Figure 8: Log Transformation for *Debt/EBITDA Ratio*
+
+```{r}
+p3 <- ggplot(data = bond_data, aes(x = total_debt_ebitda)) + 
+  geom_histogram(bins = 25, color = "black", fill = "white") + 
+  labs(
+    title = "Histogram of Debt/EBITDA",
+ 
+    x = "Debt/EBITDA Ratio",
+    y = "Frequency"
+    )
+
+p4 <- ggplot(data = bond_data, aes(x = log(total_debt_ebitda))) + 
+  geom_histogram(bins = 25, color = "black", fill = "white") + 
+  labs(
+    title = "Histogram of log(Debt/EBITDA)",
+
+    x = "log(Debt/EBITDA Ratio)",
+    y = "Frequency"
+    )
+
+p3 + p4
+```
+
+
+\newpage
+
+
+## Figure 9: Model Summary and Diaganostic Plots **With** Log(*Debt/Ebitda Ratio*) 
+
+```{r}
+# Compare model performance with vs. without log-transforming Debt/EBITDA
+# Figure 9 is with the log transformation, Figure 10 is without the log transformation
+
+lm_yield_2 <- lm(yield_to_maturity ~ log(total_debt_ebitda) + ebitda_margin + 
+                   log(market_value) + time_to_maturity, data = bond_data)
+
+summary(lm_yield_2)
+plot(lm_yield_2, which = 1, id.n = 0, add.smooth = FALSE)
+plot(lm_yield_2, which = 2, id.n = 0)
+```
+
+\newpage
+
+## Figure 10: Model Summary and Diaganostic Plots **Without** Log(*Debt/Ebitda Ratio*) 
+
+```{r}
+# Compare model performance with vs. without log-transforming Debt/EBITDA
+# Figure 9 is with the log transformation, Figure 10 is without the log transformation
+
+lm_yield_3 <- lm(yield_to_maturity ~ total_debt_ebitda + ebitda_margin + 
+                   log(market_value) + time_to_maturity, data = bond_data)
+
+
+summary(lm_yield_3)
+plot(lm_yield_3, which = 1, id.n = 0, add.smooth = FALSE)
+plot(lm_yield_3, which = 2, id.n = 0)
+```
+
+
+
+\newpage
+
+## Figure 11: Scatterplot Matrix After Appropriate Log Transformations
+
+```{r}
+plot(~ yield_to_maturity + total_debt_ebitda + ebitda_margin + 
+       log(market_value), data = bond_data)
+```
+
+
+\newpage
+
+## Figure 12: Multicollinearity Diagnostics After Appropriate Log Transformations
+
+```{r}
+bond_data |> 
+  select(yield_to_maturity, total_debt_ebitda, ebitda_margin, market_value) |> 
+  mutate(`log(market_value)` = log(market_value)) |> 
+  select(-market_value) |> 
+  cor()
+
+vif(lm(yield_to_maturity ~ total_debt_ebitda + ebitda_margin + 
+         log(market_value), data = bond_data))
+```
+
+
+\newpage
+
+## Figure 13: Model Summary with *Sales* as a Predictor
+
+```{r}
+lm_yield_4 <- lm(yield_to_maturity ~ total_debt_ebitda + ebitda_margin + 
+                   log(market_value) + time_to_maturity + 
+                   sales, data = bond_data)
+summary(lm_yield_4)
+
+
+
+vif(lm(yield_to_maturity ~ total_debt_ebitda + ebitda_margin + 
+         log(market_value) + sales, data = bond_data))
+
+```
+
+
+\newpage
+
+## Figure 14: Model Summary and Diagnostic Plots with *RBICS Economy* as a Predictor
+
+```{r}
+lm_yield_11 <- lm(yield_to_maturity ~ total_debt_ebitda + ebitda_margin + 
+                    log(market_value) + time_to_maturity + 
+                    rbics_economy, data = bond_data)
+
+
+summary(lm_yield_11)
+
+plot(lm_yield_11, which = 1, id.n = 0, add.smooth = FALSE)
+plot(lm_yield_11, which = 2, id.n = 0)
+
+```
+
+
+
+\newpage
+
+## Figure 15: Nested F-Test for *RBICS Economy*
+
+```{r}
+#lm_yield_3 is the model without rbics
+
+# Nested F-test to formally evaluate if adding RBICS sector improves model fit
+lm_yield_11 <- lm(yield_to_maturity ~ total_debt_ebitda + 
+                    time_to_maturity + ebitda_margin + log(market_value) + 
+                    rbics_economy, data = bond_data)
+
+
+anova(lm_yield_3, lm_yield_11, test = "F")
+```
+\newpage
+
+## Figure 16: Mallow's Cp for *RBICS Economy*
+```{r}
+
+
+
+bond_data2 <- bond_data |> 
+  mutate(issue_date = mdy(issue_date)) 
+lm_full <- lm(yield_to_maturity ~ amount_out + issue_date + years_to_maturity + 
+                year_matured + rbics_economy + sales + log(market_value) + 
+                total_debt_ebitda * time_to_maturity + ebitda_margin, data = bond_data2)
+#summary(lm_full)
+
+```
+
+```{r}
+#lm_yield_3 is the model without rbics
+
+ols_mallows_cp(lm_yield_11, lm_full)
+ols_mallows_cp(lm_yield_3, lm_full)
+```
+
+
+
+\newpage
+
+## Figure 17: Interaction Between *Debt/EBITDA Ratio* and *Time to Maturity*
+
+```{r}
+ggplot(data = bond_data,
+  aes(x = total_debt_ebitda, y = yield_to_maturity, 
+      color = time_to_maturity, shape = time_to_maturity)) + 
+  geom_point(alpha = 0.5) + 
+  geom_smooth(method = "lm", formula = y ~ x, se = FALSE) +
+  labs(title = "Scatterplot of Yield to Maturity vs Debt/EBITDA by Time to Maturity",
+       subtitle = "Data is from 1081 bonds issued in the past year",
+       x = "Debt/EBITDA Ratio",
+       y = "Yield to Maturity (in %)")
+```
+\newpage
+
+## Figure 18: Model Summary and Diagnostic Plots for the *Debt/EBITDA* and *Time to Maturity* Interaction
+
+```{r}
+# Fit final model incorporating the interaction between Debt/EBITDA and Time to Maturity
+lm_yield_final <- lm(yield_to_maturity ~ total_debt_ebitda * time_to_maturity + 
+                       ebitda_margin + log(market_value) + rbics_economy, 
+                     data = bond_data)
+
+
+summary(lm_yield_final)
+plot(lm_yield_final, which = 1, id.n = 0, add.smooth = FALSE)
+plot(lm_yield_final, which = 2, id.n = 0)
+
+```
+
+
+
+\newpage
+
+
+## Figure 19: Nested F-test for the *Debt/EBITDA* and *Time to Maturity* Interaction
+
+```{r}
+
+#lm_yield_11 is the model with no interaction
+
+# # Nested F-test to formally evaluate if adding the interaction improves model fit
+
+anova(lm_yield_11, lm_yield_final, test = "F")
+```
+
+\newpage
+
+
+## Figure 20: Mallow's Cp for the *Debt/EBITDA* and *Time to Maturity* Interaction
+
+```{r}
+#lm_yield_11 is the model with no interaction
+
+ols_mallows_cp(lm_yield_11, lm_full)
+ols_mallows_cp(lm_yield_final, lm_full)
+
+```
+
+\newpage
+
+## Figure 21: Residual vs Fitted Values by *RBICS Economy*
+
+```{r}
+
+bond_data |>
+  add_predictions(lm_yield_final) |> 
+  add_residuals(lm_yield_final) |> 
+  ggplot(aes(x = pred, y = resid)) +
+  scale_color_viridis_d(option = "plasma")+
+  geom_point(alpha = 0.8, mapping = aes(color = rbics_economy)) +
+  theme(
+    legend.position = "right"
+  ) +
+geom_smooth(method = "lm", formula = y ~ x, se = F) +
+  labs(
+    title = "Residual vs Fitted Value Plot by RBICS Sector",
+    subtitle = "(for the final model)",
+    x = "Fitted Value",
+    y = "Residuals"
+  )
+
+
+```
+
+
+\newpage
+
+## Figure 22: Residual vs Fitted Values by *Time to Maturity*
+
+```{r}
+
+bond_data |>
+  add_predictions(lm_yield_final) |> 
+  add_residuals(lm_yield_final) |> 
+  ggplot(aes(x = pred, y = resid)) +
+  scale_color_viridis_d(option = "plasma")+
+  geom_point(alpha = 0.8, mapping = aes(color = time_to_maturity)) +
+  theme(
+    legend.position = "right"
+  ) +
+geom_smooth(method = "lm", formula = y ~ x, se = F) +
+    labs(
+    title = "Residual vs Fitted Value Plot by Time to Maturity",
+    subtitle = "(for the final model)",
+    x = "Fitted Value",
+    y = "Residuals"
+  )
+
+
+```
+

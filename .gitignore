@@ -1,0 +1,9 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+data/
+data wrangling/
+work_in_progress_analysis.Rmd
+.DS_Store
+data_cleaning.Rmd
